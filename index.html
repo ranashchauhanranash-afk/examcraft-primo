@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamCraft AI - Student Question Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+                }
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        html { scroll-behavior: smooth; }
+        body { transition: background-color .25s, color .25s; }
+        .question-card { break-inside: avoid; }
+        .format-option {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            padding: .7rem .75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: .8rem;
+            font-size: .8rem;
+            cursor: pointer;
+            transition: .2s;
+        }
+        .dark .format-option { border-color: #334155; }
+        .format-option:has(input:checked) {
+            border-color: #818cf8;
+            background: rgba(99,102,241,.07);
+            color: #4f46e5;
+        }
+        .dark .format-option:has(input:checked) {
+            color: #a5b4fc;
+            background: rgba(99,102,241,.12);
+        }
+        .format-option input { accent-color: #4f46e5; }
+        @media print {
+            body { background: white !important; color: #111827 !important; }
+            .no-print, header, #inputPanel, #statusBox, #helpGuide, #apiKeySection { display: none !important; }
+            #resultsPanel { display: block !important; border: 0 !important; box-shadow: none !important; }
+            .question-card { border: 1px solid #ddd !important; box-shadow: none !important; }
+            #answerOutput { display: block !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 font-sans min-h-screen">
+
+    <header class="no-print border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-indigo-600 text-white grid place-items-center font-bold text-xl">
+                    E
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-lg">ExamCraft <span class="text-indigo-600">AI</span></h1>
+                    <p class="text-xs text-slate-500">Your notes. Your practice. Your progress.</p>
+                </div>
+            </div>
+            <button id="themeToggle" class="rounded-xl border p-2 dark:border-slate-700" title="Toggle Dark Mode">🌙</button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        
+        <section class="mb-8">
+            <div class="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 px-3 py-1 text-xs font-semibold mb-4">
+                ● AI-powered exam preparation
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-black tracking-tight">
+                Turn your notes into <span class="text-indigo-600">practice questions.</span>
+            </h2>
+            <p class="mt-3 text-slate-600 dark:text-slate-400">
+                Upload a page or paste your chapter notes. Build a focused practice set with an answer key in seconds.
+            </p>
+        </section>
+
+        <!-- CLEAR ENGLISH STEP-BY-STEP API GUIDE -->
+        <section id="helpGuide" class="no-print mb-6 rounded-3xl border border-indigo-200 dark:border-indigo-900 bg-gradient-to-br from-indigo-50/80 to-slate-50 dark:from-indigo-950/30 dark:to-slate-900 p-5 sm:p-6 shadow-sm">
+            <h3 class="font-bold text-base text-indigo-950 dark:text-indigo-200 mb-3 flex items-center gap-2">
+                <span class="text-xl">🔑</span> Quick Guide: How to Get Your Free Gemini API Key
+            </h3>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <!-- Step 1 -->
+                <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold grid place-items-center mb-2 text-xs">1</div>
+                        <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-1">Open Google AI Studio</h4>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                            Click the link below to open Google AI Studio, then sign in with your free Google (Gmail) account.
+                        </p>
+                    </div>
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="mt-4 block text-center rounded-xl bg-indigo-600 text-white font-semibold py-2.5 px-3 hover:bg-indigo-700 transition shadow-sm">
+                        🔗 Click Here to Get API Key
+                    </a>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold grid place-items-center mb-2 text-xs">2</div>
+                        <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-1">Create & Copy Your Key</h4>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                            On that page, click the blue <strong>"Create API key"</strong> button. Once your secret code appears, click <strong>"Copy"</strong>.
+                        </p>
+                    </div>
+                    <div class="mt-4 text-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold py-2.5 px-3">
+                        📋 Click "Create API key" → "Copy"
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold grid place-items-center mb-2 text-xs">3</div>
+                        <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-1">Paste & Start Practicing</h4>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                            Come back here, paste your copied key into the yellow box below, and click <strong>"Save Key"</strong> to start!
+                        </p>
+                    </div>
+                    <a href="#apiKey" class="mt-4 block text-center rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold py-2.5 px-3 hover:bg-emerald-100 transition">
+                        ✨ Paste Key Below
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- API KEY SECTION -->
+        <section id="apiKeySection" class="no-print mb-6 rounded-2xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4">
+            <h2 class="font-bold text-sm mb-2"> 🔐 Paste Your Gemini API Key Here </h2>
+            <p class="text-xs text-amber-800 dark:text-amber-300 mb-3">
+                Your API key is saved safely inside your own browser so you don't have to paste it again.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input id="apiKey" type="password" autocomplete="off" placeholder="Paste your copied Gemini API key here (starts with AIza...)" class="flex-1 rounded-xl border px-4 py-3 text-sm bg-white dark:bg-slate-900 dark:border-slate-700 outline-none focus:ring-2 focus:ring-amber-500" />
+                <button id="saveKeyBtn" class="rounded-xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white px-5 py-3 text-sm font-semibold hover:opacity-90 transition">Save Key</button>
+                <button id="clearKeyBtn" class="rounded-xl border border-amber-300 dark:border-amber-800 px-4 py-3 text-sm hover:bg-amber-100 dark:hover:bg-amber-900/40 transition">Clear</button>
+            </div>
+            <p id="keyStatus" class="text-xs font-medium mt-2 text-amber-900 dark:text-amber-300"></p>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+            
+            <!-- INPUT PANEL -->
+            <section id="inputPanel" class="lg:col-span-2 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg p-5 sm:p-6">
+                <div class="mb-5">
+                    <h2 class="font-bold text-xl">Create a Question Set</h2>
+                    <p class="text-xs text-slate-500 mt-1">Start with your study material</p>
+                </div>
+
+                <label class="block text-sm font-semibold mb-2"> Chapter Notes </label>
+                <textarea id="notes" rows="7" placeholder="Paste your chapter notes here..." class="w-full resize-y rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                <div class="flex justify-between text-xs text-slate-400 mt-2">
+                    <span>Enter your study material</span>
+                    <span id="charCount">0 characters</span>
+                </div>
+
+                <div class="my-5 text-center text-xs text-slate-400 font-semibold">OR UPLOAD A TEXTBOOK PHOTO</div>
+
+                <label for="imageInput" class="flex flex-col items-center justify-center text-center rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5 cursor-pointer hover:border-indigo-400 transition">
+                    <div class="text-3xl mb-2">📸</div>
+                    <span class="font-semibold text-sm"> Choose a Textbook Image </span>
+                    <span class="text-xs text-slate-500 mt-1"> PNG, JPG, WEBP (Auto Text Scan) </span>
+                    <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
+                </label>
+                <div id="ocrStatus" class="hidden mt-3 rounded-xl p-3 text-xs"></div>
+
+                <!-- SUBJECT AND QUANTITY -->
+                <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2"> Subject </label>
+                        <select id="subject" class="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-3 text-sm">
+                            <option>Mathematics</option>
+                            <option>Science</option>
+                            <option>Social Science</option>
+                            <option>English</option>
+                            <option>Hindi</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2"> Number of Questions </label>
+                        <input id="quantity" type="number" min="1" max="50" value="10" class="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-3 text-sm" />
+                    </div>
+                </div>
+
+                <!-- QUESTION FORMATS -->
+                <fieldset class="mt-6">
+                    <legend class="text-sm font-semibold mb-3"> Question Formats </legend>
+                    <div id="formatList" class="grid grid-cols-2 gap-2">
+                        <label class="format-option"> <input type="checkbox" value="MCQs" checked> MCQs </label>
+                        <label class="format-option"> <input type="checkbox" value="True/False" checked> True / False </label>
+                        <label class="format-option"> <input type="checkbox" value="Fill in the Blanks" checked> Fill in the Blanks </label>
+                        <label class="format-option"> <input type="checkbox" value="Match the Following"> Match the Following </label>
+                        <label class="format-option"> <input type="checkbox" value="2-Mark"> 2-Mark Questions </label>
+                        <label class="format-option"> <input type="checkbox" value="3-Mark"> 3-Mark Questions </label>
+                        <label class="format-option col-span-2"> <input type="checkbox" value="4-Mark"> 4-Mark Questions </label>
+                    </div>
+                </fieldset>
+
+                <!-- GENERATE BUTTON -->
+                <button id="generateBtn" class="mt-7 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold py-3.5 px-4 transition shadow-md">
+                    ✨ Generate Questions
+                </button>
+            </section>
+
+            <!-- RESULTS PANEL -->
+            <section id="resultsPanel" class="lg:col-span-3 min-h-[500px] rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                    <div>
+                        <div class="text-xs font-bold tracking-wider text-indigo-600 mb-1"> 02 / YOUR PRACTICE SET </div>
+                        <h2 id="resultsTitle" class="font-bold text-xl"> Generated Questions </h2>
+                        <p id="resultsMeta" class="text-xs text-slate-500 mt-1"> Your questions will appear here. </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 no-print">
+                        <button id="answerToggle" disabled class="rounded-xl border dark:border-slate-700 px-3 py-2 text-xs font-semibold disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition"> Show Answer Key </button>
+                        <button id="printBtn" disabled class="rounded-xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white px-3 py-2 text-xs font-semibold disabled:opacity-40 hover:opacity-90 transition"> Print / Save PDF </button>
+                    </div>
+                </div>
+
+                <div id="statusBox" class="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-8 text-center">
+                    <div class="text-4xl mb-4">📚</div>
+                    <h3 class="font-bold"> Ready when you are </h3>
+                    <p class="text-sm text-slate-500 mt-2"> Follow the 3 steps above to add your API key, paste your notes or upload a photo, and click Generate! </p>
+                </div>
+
+                <div id="questionOutput" class="space-y-3"></div>
+
+                <div id="answerOutput" class="hidden mt-6 border-t border-slate-200 dark:border-slate-800 pt-5">
+                    <h3 class="font-bold text-lg mb-3"> Answer Key & Explanations </h3>
+                    <div id="answerList" class="space-y-3"></div>
+                </div>
+            </section>
+
+        </div>
+
+        <footer class="no-print text-center text-xs text-slate-400 py-8">
+            ExamCraft AI · Built for focused learning
+        </footer>
+    </main>
+
+    <script>
+        const API_MODEL = 'gemini-2.5-flash';
+        const $ = id => document.getElementById(id);
+        let generatedQuestions = [];
+        let answerKeyVisible = false;
+
+        if (localStorage.getItem('examcraft-theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+
+        const savedKey = localStorage.getItem('examcraft-gemini-key');
+        if (savedKey) {
+            $('apiKey').value = savedKey;
+            $('keyStatus').textContent = '✅ API key saved in this browser.';
+        }
+
+        $('themeToggle').addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('examcraft-theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        });
+
+        $('saveKeyBtn').addEventListener('click', () => {
+            const key = $('apiKey').value.trim();
+            if (!key) { $('keyStatus').textContent = '⚠️ Please paste an API key first.'; return; }
+            localStorage.setItem('examcraft-gemini-key', key);
+            $('keyStatus').textContent = '✅ API key saved! Now add your notes below and click Generate Questions.';
+        });
+
+        $('clearKeyBtn').addEventListener('click', () => {
+            localStorage.removeItem('examcraft-gemini-key');
+            $('apiKey').value = '';
+            $('keyStatus').textContent = 'API key cleared.';
+        });
+
+        $('notes').addEventListener('input', () => {
+            $('charCount').textContent = $('notes').value.length.toLocaleString() + ' characters';
+        });
+
+        $('imageInput').addEventListener('change', async event => {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+                showOcr('Please choose a PNG, JPG, or WEBP image.', true);
+                event.target.value = '';
+                return;
+            }
+            if (file.size > 12 * 1024 * 1024) {
+                showOcr('Image must be smaller than 12 MB.', true);
+                event.target.value = '';
+                return;
+            }
+            showOcr('Reading image text...');
+            try {
+                const result = await Tesseract.recognize(file, 'eng', {
+                    logger: message => {
+                        if (message.status === 'recognizing text') {
+                            showOcr('Extracting text: ' + Math.round(message.progress * 100) + '%');
+                        }
+                    }
+                });
+                const extracted = result.data.text.trim();
+                if (!extracted) { showOcr('No readable text found. Try a clearer photo.', true); return; }
+                $('notes').value += ($('notes').value.trim() ? '\n\n' : '') + extracted;
+                $('notes').dispatchEvent(new Event('input'));
+                showOcr('✅ Text extracted successfully! You can review or edit it above.');
+            } catch (error) {
+                showOcr('OCR failed. Please try another image.', true);
+            } finally { event.target.value = ''; }
+        });
+
+        function showOcr(message, error = false) {
+            $('ocrStatus').classList.remove('hidden');
+            $('ocrStatus').textContent = message;
+            $('ocrStatus').className = 'mt-3 rounded-xl p-3 text-xs ' + (error ? 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300');
+        }
+
+        $('generateBtn').addEventListener('click', generateQuestions);
+
+        async function generateQuestions() {
+            const apiKey = $('apiKey').value.trim();
+            const notes = $('notes').value.trim();
+            const quantity = Number($('quantity').value);
+            const subject = $('subject').value;
+            const formats = [...document.querySelectorAll('#formatList input:checked')].map(i => i.value);
+
+            if (!apiKey) { return showError('Please paste your Gemini API key in the yellow box above (follow the 3 steps).'); }
+            if (!notes) { return showError('Please paste chapter notes or upload a textbook photo.'); }
+            if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50) { return showError('Choose between 1 and 50 questions.'); }
+            if (!formats.length) { return showError('Please select at least one question format.'); }
+
+            setLoading(true);
+            $('statusBox').classList.add('hidden');
+            $('questionOutput').innerHTML = '';
+            $('answerOutput').classList.add('hidden');
+            $('answerToggle').disabled = true;
+            $('printBtn').disabled = true;
+            answerKeyVisible = false;
+            $('answerToggle').textContent = 'Show Answer Key';
+
+            const prompt = `
+You are an expert school board teacher and exam setter.
+Create exactly ${quantity} original practice questions.
+SUBJECT: ${subject}
+REQUESTED FORMATS: ${formats.join(', ')}
+
+INSTRUCTIONS:
+1. Use ONLY the supplied study notes as the factual source.
+2. Match school board examination style.
+3. Avoid duplicate questions.
+4. MCQs must have four options labelled A-D.
+5. True/False questions must have clear statements.
+6. Fill in the Blanks must contain ______.
+7. Match the Following must include a pairs array: "pairs": [{"left":"Item A","right":"Match A"}].
+8. 2-Mark, 3-Mark and 4-Mark questions must match board exam depth.
+9. Include accurate answers and brief explanations.
+
+Return ONLY valid JSON in this exact structure:
+{
+  "title": "${subject} Practice Question Set",
+  "questions": [
+    {
+      "number": 1,
+      "type": "MCQs",
+      "marks": 1,
+      "question": "Question text",
+      "options": ["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4"],
+      "pairs": [],
+      "answer": "Correct answer",
+      "explanation": "Brief explanation"
+    }
+  ]
+}
+
+STUDY NOTES:
+${notes.slice(0, 30000)}
+`;
+
+            try {
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.45, responseMimeType: 'application/json' }
+                    })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const msg = payload?.error?.message || `API request failed (${response.status}).`;
+                    if (response.status === 400 || response.status === 401 || response.status === 403) {
+                        throw new Error('Invalid API key. Please check your Gemini API key and try again. (' + msg + ')');
+                    }
+                    throw new Error(msg);
+                }
+
+                const raw = payload?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\n');
+                if (!raw) throw new Error('Gemini returned an empty response.');
+
+                const parsed = parseModelJson(raw);
+                if (!Array.isArray(parsed.questions) || !parsed.questions.length) {
+                    throw new Error('No valid questions were returned.');
+                }
+
+                generatedQuestions = parsed.questions.slice(0, quantity);
+                renderResults(parsed.title || `${subject} Practice Set`, subject);
+            } catch (error) {
+                showError(error.message || 'Something went wrong while generating questions.');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function parseModelJson(raw) {
+            let cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+            try {
+                return JSON.parse(cleaned);
+            } catch (e) {
+                const start = cleaned.indexOf('{');
+                const end = cleaned.lastIndexOf('}');
+                if (start >= 0 && end > start) {
+                    return JSON.parse(cleaned.slice(start, end + 1));
+                }
+                throw new Error('Could not read the AI response. Please try again.');
+            }
+        }
+
+        function renderResults(title, subject) {
+            $('statusBox').classList.add('hidden');
+            $('resultsTitle').textContent = title;
+            $('resultsMeta').textContent = `${subject} · ${generatedQuestions.length} questions · Generated just now`;
+
+            $('questionOutput').innerHTML = generatedQuestions.map((q, index) => {
+                const options = Array.isArray(q.options) && q.options.length
+                    ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                        ${q.options.map(opt => `<div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 px-3 py-2 text-sm">${escapeHtml(opt)}</div>`).join('')}
+                       </div>`
+                    : '';
+
+                const pairs = Array.isArray(q.pairs) && q.pairs.length
+                    ? `<div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+                        <div class="space-y-1">${q.pairs.map(p => `<div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-2">${escapeHtml(p.left)}</div>`).join('')}</div>
+                        <div class="space-y-1">${q.pairs.map(p => `<div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-2">${escapeHtml(p.right)}</div>`).join('')}</div>
+                       </div>`
+                    : '';
+
+                return `
+                    <article class="question-card rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5">
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <span class="text-xs font-bold text-indigo-600">QUESTION ${index + 1}</span>
+                            <span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1">${escapeHtml(q.type || 'Question')} · ${Number(q.marks) || 1} mark(s)</span>
+                        </div>
+                        <p class="font-semibold text-sm sm:text-base leading-relaxed">${escapeHtml(q.question || 'Question text unavailable.')}</p>
+                        ${options}
+                        ${pairs}
+                    </article>
+                `;
+            }).join('');
+
+            $('answerList').innerHTML = generatedQuestions.map((q, index) => `
+                <div class="rounded-xl bg-emerald-50 dark:bg-emerald-950/25 border border-emerald-100 dark:border-emerald-900 p-4">
+                    <div class="text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-1">QUESTION ${index + 1}</div>
+                    <p class="text-sm font-semibold">${escapeHtml(q.answer || 'Answer not provided.')}</p>
+                    ${q.explanation ? `<p class="text-xs text-slate-600 dark:text-slate-400 mt-1">${escapeHtml(q.explanation)}</p>` : ''}
+                </div>
+            `).join('');
+
+            $('answerToggle').disabled = false;
+            $('printBtn').disabled = false;
+        }
+
+        $('answerToggle').addEventListener('click', () => {
+            answerKeyVisible = !answerKeyVisible;
+            $('answerOutput').classList.toggle('hidden', !answerKeyVisible);
+            $('answerToggle').textContent = answerKeyVisible ? 'Hide Answer Key' : 'Show Answer Key';
+        });
+
+        $('printBtn').addEventListener('click', () => window.print());
+
+        function showError(message) {
+            $('statusBox').classList.remove('hidden');
+            $('statusBox').innerHTML = `
+                <div class="text-3xl mb-3">⚠️</div>
+                <h3 class="font-bold text-red-600">Unable to Generate Questions</h3>
+                <p class="text-sm text-slate-600 dark:text-slate-400 mt-2">${escapeHtml(message)}</p>
+            `;
+        }
+
+        function setLoading(loading) {
+            $('generateBtn').disabled = loading;
+            $('generateBtn').textContent = loading ? 'Generating Questions...' : '✨ Generate Questions';
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+    </script>
+</body>
+</html>v

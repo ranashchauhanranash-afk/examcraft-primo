@@ -421,7 +421,7 @@ ${notes.slice(0, 30000)}
 
             try {
                 const targetUrl = `https://generativelanguage.googleapis.com/v1beta/${API_MODEL}:generateContent?key=${savedKey}`;
-const endpoint = `https://api.allorigins.win/raw?url=` + encodeURIComponent(targetUrl);
+const endpoint = `https://api.corsproxy.io/raw?url=` + encodeURIComponent(targetUrl);
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

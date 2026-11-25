@@ -420,7 +420,7 @@ ${notes.slice(0, 30000)}
 `;
 
             try {
-                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/${API_MODEL}:generateContent?key=${savedKey}`;
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

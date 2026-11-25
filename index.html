@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta name="google-site-verification" content="LU4lvA5P3KtGeBFbIGH9L4sS5ppc8Nl1zWZ6SZfs2r4" />
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ExamCraft AI - Student Question Generator</title>
+    <title>ExamCraft AI - Interactive Quiz Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -16,36 +15,17 @@
             }
         };
     </script>
+    <!-- Tesseract.js for OCR & Cropper.js for Image Cropping -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <style>
         html { scroll-behavior: smooth; }
         body { transition: background-color .25s, color .25s; }
         .question-card { break-inside: avoid; }
-        .format-option {
-            display: flex;
-            align-items: center;
-            gap: .6rem;
-            padding: .7rem .75rem;
-            border: 1px solid #e2e8f0;
-            border-radius: .8rem;
-            font-size: .8rem;
-            cursor: pointer;
-            transition: .2s;
-        }
-        .dark .format-option { border-color: #334155; }
-        .format-option:has(input:checked) {
-            border-color: #818cf8;
-            background: rgba(99,102,241,.07);
-            color: #4f46e5;
-        }
-        .dark .format-option:has(input:checked) {
-            color: #a5b4fc;
-            background: rgba(99,102,241,.12);
-        }
-        .format-option input { accent-color: #4f46e5; }
         @media print {
             body { background: white !important; color: #111827 !important; }
-            .no-print, header, #inputPanel, #statusBox, #helpGuide, #apiKeySection { display: none !important; }
+            .no-print, header, #inputPanel, #statusBox, #helpGuide, #apiKeySection, #loginScreen { display: none !important; }
             #resultsPanel { display: block !important; border: 0 !important; box-shadow: none !important; }
             .question-card { border: 1px solid #ddd !important; box-shadow: none !important; }
             #answerOutput { display: block !important; }
@@ -53,6 +33,39 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 font-sans min-h-screen">
+
+    <!-- GOOGLE LOGIN SCREEN -->
+    <div id="loginScreen" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center z-50 px-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full">
+            <div class="w-14 h-14 rounded-2xl bg-indigo-600 text-white grid place-items-center font-extrabold text-2xl mx-auto mb-4 shadow-lg">
+                E
+            </div>
+            <h2 class="text-2xl font-black text-slate-900 dark:text-white mb-1">ExamCraft <span class="text-indigo-600">AI</span></h2>
+            <p class="text-slate-500 dark:text-slate-400 text-xs mb-6">
+                Continue to your AI-powered interactive quiz & study assistant
+            </p>
+            <button id="googleLoginBtn" class="w-full flex items-center justify-center gap-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-white font-bold py-3.5 px-4 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5" alt="Google">
+                Sign in with Google
+            </button>
+            <p id="authError" class="text-xs text-rose-500 mt-3 hidden"></p>
+        </div>
+    </div>
+
+    <!-- CROPPER MODAL POPUP -->
+    <div id="cropModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl max-w-lg w-full shadow-2xl">
+            <h3 class="font-bold text-lg mb-2">Crop Your Image</h3>
+            <p class="text-xs text-slate-500 mb-4">Adjust the box to select the exact notes area you want to scan.</p>
+            <div class="max-h-[60vh] overflow-hidden flex justify-center bg-slate-950 rounded-xl mb-4">
+                <img id="imageToCrop" class="max-w-full block" alt="Source" />
+            </div>
+            <div class="flex justify-end gap-3">
+                <button id="cancelCropBtn" class="px-4 py-2 rounded-xl border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition">Cancel</button>
+                <button id="confirmCropBtn" class="px-5 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">Crop & Scan</button>
+            </div>
+        </div>
+    </div>
 
     <header class="no-print border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 sticky top-0 z-30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -65,7 +78,13 @@
                     <p class="text-xs text-slate-500">Your notes. Your practice. Your progress.</p>
                 </div>
             </div>
-            <button id="themeToggle" class="rounded-xl border p-2 dark:border-slate-700" title="Toggle Dark Mode">🌙</button>
+            <div class="flex items-center gap-2 sm:gap-3">
+                <span id="userNameDisplay" class="hidden sm:inline text-xs font-semibold text-slate-600 dark:text-slate-300"></span>
+                <button id="logoutBtn" class="hidden rounded-xl border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 px-3 py-1.5 text-xs font-semibold hover:bg-rose-50 dark:hover:bg-rose-950 transition">
+                    Logout
+                </button>
+                <button id="themeToggle" class="rounded-xl border p-2 dark:border-slate-700" title="Toggle Dark Mode">🌙</button>
+            </div>
         </div>
     </header>
 
@@ -73,13 +92,13 @@
         
         <section class="mb-8">
             <div class="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 px-3 py-1 text-xs font-semibold mb-4">
-                ● AI-powered exam preparation
+                ● AI-powered interactive quiz
             </div>
             <h2 class="text-3xl sm:text-4xl font-black tracking-tight">
-                Turn your notes into <span class="text-indigo-600">practice questions.</span>
+                Turn your notes into an <span class="text-indigo-600">Interactive Quiz.</span>
             </h2>
             <p class="mt-3 text-slate-600 dark:text-slate-400">
-                Upload a page or paste your chapter notes. Build a focused practice set with an answer key in seconds.
+                Upload multiple notes or photos, crop them, play the quiz, and get instant performance analysis!
             </p>
         </section>
 
@@ -90,13 +109,12 @@
             </h3>
             
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <!-- Step 1 -->
                 <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col justify-between">
                     <div>
                         <div class="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold grid place-items-center mb-2 text-xs">1</div>
                         <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-1">Open Google AI Studio</h4>
                         <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
-                            Click the link below to open Google AI Studio, then sign in with your free Google (Gmail) account.
+                            Click the link below to open Google AI Studio, then sign in with your free Google account.
                         </p>
                     </div>
                     <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="mt-4 block text-center rounded-xl bg-indigo-600 text-white font-semibold py-2.5 px-3 hover:bg-indigo-700 transition shadow-sm">
@@ -104,13 +122,12 @@
                     </a>
                 </div>
 
-                <!-- Step 2 -->
                 <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col justify-between">
                     <div>
                         <div class="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold grid place-items-center mb-2 text-xs">2</div>
                         <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-1">Create & Copy Your Key</h4>
                         <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
-                            On that page, click the blue <strong>"Create API key"</strong> button. Once your secret code appears, click <strong>"Copy"</strong>.
+                            On that page, click <strong>"Create API key"</strong>, then click <strong>"Copy"</strong>.
                         </p>
                     </div>
                     <div class="mt-4 text-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold py-2.5 px-3">
@@ -118,13 +135,12 @@
                     </div>
                 </div>
 
-                <!-- Step 3 -->
                 <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col justify-between">
                     <div>
                         <div class="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold grid place-items-center mb-2 text-xs">3</div>
                         <h4 class="font-bold text-slate-900 dark:text-slate-100 mb-1">Paste & Start Practicing</h4>
                         <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
-                            Come back here, paste your copied key into the yellow box below, and click <strong>"Save Key"</strong> to start!
+                            Come back here, paste your copied key into the yellow box below, and click <strong>"Save Key"</strong>!
                         </p>
                     </div>
                     <a href="#apiKey" class="mt-4 block text-center rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold py-2.5 px-3 hover:bg-emerald-100 transition">
@@ -138,7 +154,7 @@
         <section id="apiKeySection" class="no-print mb-6 rounded-2xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4">
             <h2 class="font-bold text-sm mb-2"> 🔐 Paste Your Gemini API Key Here </h2>
             <p class="text-xs text-amber-800 dark:text-amber-300 mb-3">
-                Your API key is saved safely inside your own browser so you don't have to paste it again.
+                Your API key is saved safely inside your own browser.
             </p>
             <div class="flex flex-col sm:flex-row gap-2">
                 <input id="apiKey" type="password" autocomplete="off" placeholder="Paste your copied Gemini API key here (starts with AIza...)" class="flex-1 rounded-xl border px-4 py-3 text-sm bg-white dark:bg-slate-900 dark:border-slate-700 outline-none focus:ring-2 focus:ring-amber-500" />
@@ -153,24 +169,25 @@
             <!-- INPUT PANEL -->
             <section id="inputPanel" class="lg:col-span-2 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg p-5 sm:p-6">
                 <div class="mb-5">
-                    <h2 class="font-bold text-xl">Create a Question Set</h2>
+                    <h2 class="font-bold text-xl">Create a Quiz Game</h2>
                     <p class="text-xs text-slate-500 mt-1">Start with your study material</p>
                 </div>
 
                 <label class="block text-sm font-semibold mb-2"> Chapter Notes </label>
-                <textarea id="notes" rows="7" placeholder="Paste your chapter notes here..." class="w-full resize-y rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                <textarea id="notes" rows="6" placeholder="Paste your chapter notes here..." class="w-full resize-y rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                 <div class="flex justify-between text-xs text-slate-400 mt-2">
-                    <span>Enter your study material</span>
+                    <span>Enter or scan study material</span>
                     <span id="charCount">0 characters</span>
                 </div>
 
-                <div class="my-5 text-center text-xs text-slate-400 font-semibold">OR UPLOAD A TEXTBOOK PHOTO</div>
+                <div class="my-4 text-center text-xs text-slate-400 font-semibold">OR UPLOAD MULTIPLE PHOTOS</div>
 
-                <label for="imageInput" class="flex flex-col items-center justify-center text-center rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5 cursor-pointer hover:border-indigo-400 transition">
-                    <div class="text-3xl mb-2">📸</div>
-                    <span class="font-semibold text-sm"> Choose a Textbook Image </span>
-                    <span class="text-xs text-slate-500 mt-1"> PNG, JPG, WEBP (Auto Text Scan) </span>
-                    <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
+                <label for="imageInput" class="flex flex-col items-center justify-center text-center rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-4 cursor-pointer hover:border-indigo-400 transition">
+                    <div class="text-3xl mb-1">📸</div>
+                    <span class="font-semibold text-sm"> Choose Multiple Textbook Images </span>
+                    <span class="text-xs text-slate-500 mt-1"> Select multiple photos to crop & scan </span>
+                    <!-- MULTIPLE attribute added here -->
+                    <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" multiple class="hidden" />
                 </label>
                 <div id="ocrStatus" class="hidden mt-3 rounded-xl p-3 text-xs"></div>
 
@@ -188,27 +205,13 @@
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2"> Number of Questions </label>
-                        <input id="quantity" type="number" min="1" max="50" value="10" class="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-3 text-sm" />
+                        <input id="quantity" type="number" min="1" max="20" value="5" class="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-3 text-sm" />
                     </div>
                 </div>
 
-                <!-- QUESTION FORMATS -->
-                <fieldset class="mt-6">
-                    <legend class="text-sm font-semibold mb-3"> Question Formats </legend>
-                    <div id="formatList" class="grid grid-cols-2 gap-2">
-                        <label class="format-option"> <input type="checkbox" value="MCQs" checked> MCQs </label>
-                        <label class="format-option"> <input type="checkbox" value="True/False" checked> True / False </label>
-                        <label class="format-option"> <input type="checkbox" value="Fill in the Blanks" checked> Fill in the Blanks </label>
-                        <label class="format-option"> <input type="checkbox" value="Match the Following"> Match the Following </label>
-                        <label class="format-option"> <input type="checkbox" value="2-Mark"> 2-Mark Questions </label>
-                        <label class="format-option"> <input type="checkbox" value="3-Mark"> 3-Mark Questions </label>
-                        <label class="format-option col-span-2"> <input type="checkbox" value="4-Mark"> 4-Mark Questions </label>
-                    </div>
-                </fieldset>
-
                 <!-- GENERATE BUTTON -->
                 <button id="generateBtn" class="mt-7 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold py-3.5 px-4 transition shadow-md">
-                    ✨ Generate Questions
+                    ✨ Generate Quiz Game
                 </button>
             </section>
 
@@ -216,26 +219,25 @@
             <section id="resultsPanel" class="lg:col-span-3 min-h-[500px] rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg p-5 sm:p-6">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                     <div>
-                        <div class="text-xs font-bold tracking-wider text-indigo-600 mb-1"> 02 / YOUR PRACTICE SET </div>
-                        <h2 id="resultsTitle" class="font-bold text-xl"> Generated Questions </h2>
-                        <p id="resultsMeta" class="text-xs text-slate-500 mt-1"> Your questions will appear here. </p>
+                        <div class="text-xs font-bold tracking-wider text-indigo-600 mb-1"> 02 / YOUR INTERACTIVE QUIZ </div>
+                        <h2 id="resultsTitle" class="font-bold text-xl"> Quiz Game </h2>
+                        <p id="resultsMeta" class="text-xs text-slate-500 mt-1"> Your quiz questions will appear here. </p>
                     </div>
                     <div class="flex flex-wrap gap-2 no-print">
-                        <button id="answerToggle" disabled class="rounded-xl border dark:border-slate-700 px-3 py-2 text-xs font-semibold disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition"> Show Answer Key </button>
                         <button id="printBtn" disabled class="rounded-xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white px-3 py-2 text-xs font-semibold disabled:opacity-40 hover:opacity-90 transition"> Print / Save PDF </button>
                     </div>
                 </div>
 
                 <div id="statusBox" class="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-8 text-center">
-                    <div class="text-4xl mb-4">📚</div>
-                    <h3 class="font-bold"> Ready when you are </h3>
-                    <p class="text-sm text-slate-500 mt-2"> Follow the 3 steps above to add your API key, paste your notes or upload a photo, and click Generate! </p>
+                    <div class="text-4xl mb-4">🎮</div>
+                    <h3 class="font-bold"> Ready to play & test? </h3>
+                    <p class="text-sm text-slate-500 mt-2"> Add your API key, add notes or multiple crop-ready photos, and click Generate Quiz Game! </p>
                 </div>
 
-                <div id="questionOutput" class="space-y-3"></div>
+                <div id="questionOutput" class="space-y-4"></div>
 
                 <div id="answerOutput" class="hidden mt-6 border-t border-slate-200 dark:border-slate-800 pt-5">
-                    <h3 class="font-bold text-lg mb-3"> Answer Key & Explanations </h3>
+                    <h3 class="font-bold text-lg mb-3"> Answer Explanations </h3>
                     <div id="answerList" class="space-y-3"></div>
                 </div>
             </section>
@@ -247,11 +249,14 @@
         </footer>
     </main>
 
+    <!-- QUIZ & CROPPER SCRIPT -->
     <script>
-        const API_MODEL = 'gemini-3.8-flash';
+        const API_MODEL = 'gemini-2.5-flash';
         const $ = id => document.getElementById(id);
         let generatedQuestions = [];
-        let answerKeyVisible = false;
+        let userAnswers = {};
+        let cropper = null;
+        let imageQueue = [];
 
         if (localStorage.getItem('examcraft-theme') === 'dark') {
             document.documentElement.classList.add('dark');
@@ -272,7 +277,7 @@
             const key = $('apiKey').value.trim();
             if (!key) { $('keyStatus').textContent = '⚠️ Please paste an API key first.'; return; }
             localStorage.setItem('examcraft-gemini-key', key);
-            $('keyStatus').textContent = '✅ API key saved! Now add your notes below and click Generate Questions.';
+            $('keyStatus').textContent = '✅ API key saved!';
         });
 
         $('clearKeyBtn').addEventListener('click', () => {
@@ -285,36 +290,79 @@
             $('charCount').textContent = $('notes').value.length.toLocaleString() + ' characters';
         });
 
-        $('imageInput').addEventListener('change', async event => {
-            const file = event.target.files[0];
-            if (!file) return;
+        // MULTIPLE FILES & CROPPER QUEUE LOGIC
+        $('imageInput').addEventListener('change', event => {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
+            
+            imageQueue = files;
+            event.target.value = ''; // reset input
+            processNextImageInQueue();
+        });
+
+        function processNextImageInQueue() {
+            if (imageQueue.length === 0) return;
+            const file = imageQueue.shift();
+
             if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
-                showOcr('Please choose a PNG, JPG, or WEBP image.', true);
-                event.target.value = '';
+                processNextImageInQueue();
                 return;
             }
-            if (file.size > 12 * 1024 * 1024) {
-                showOcr('Image must be smaller than 12 MB.', true);
-                event.target.value = '';
-                return;
-            }
-            showOcr('Reading image text...');
-            try {
-                const result = await Tesseract.recognize(file, 'eng', {
-                    logger: message => {
-                        if (message.status === 'recognizing text') {
-                            showOcr('Extracting text: ' + Math.round(message.progress * 100) + '%');
-                        }
-                    }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                $('imageToCrop').src = e.target.result;
+                $('cropModal').classList.remove('hidden');
+                
+                if (cropper) cropper.destroy();
+                cropper = new Cropper($('imageToCrop'), {
+                    aspectRatio: NaN,
+                    viewMode: 1,
                 });
-                const extracted = result.data.text.trim();
-                if (!extracted) { showOcr('No readable text found. Try a clearer photo.', true); return; }
-                $('notes').value += ($('notes').value.trim() ? '\n\n' : '') + extracted;
-                $('notes').dispatchEvent(new Event('input'));
-                showOcr('✅ Text extracted successfully! You can review or edit it above.');
-            } catch (error) {
-                showOcr('OCR failed. Please try another image.', true);
-            } finally { event.target.value = ''; }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        $('cancelCropBtn').addEventListener('click', () => {
+            $('cropModal').classList.add('hidden');
+            if (cropper) cropper.destroy();
+            processNextImageInQueue(); // Skip and move to next if any
+        });
+
+        $('confirmCropBtn').addEventListener('click', async () => {
+            if (!cropper) return;
+            const canvas = cropper.getCroppedCanvas();
+            $('cropModal').classList.add('hidden');
+            cropper.destroy();
+
+            showOcr('Scanning cropped image text...');
+            
+            canvas.toBlob(async (blob) => {
+                try {
+                    const result = await Tesseract.recognize(blob, 'eng', {
+                        logger: message => {
+                            if (message.status === 'recognizing text') {
+                                showOcr('Extracting text: ' + Math.round(message.progress * 100) + '%');
+                            }
+                        }
+                    });
+                    const extracted = result.data.text.trim();
+                    if (extracted) {
+                        $('notes').value += ($('notes').value.trim() ? '\n\n' : '') + extracted;
+                        $('notes').dispatchEvent(new Event('input'));
+                        showOcr('✅ Cropped photo added successfully!');
+                    } else {
+                        showOcr('No readable text found in selection.', true);
+                    }
+                } catch (err) {
+                    showOcr('OCR scan failed.', true);
+                }
+                
+                // Process next image in queue if multiple were selected
+                if (imageQueue.length > 0) {
+                    setTimeout(processNextImageInQueue, 500);
+                }
+            }, 'image/jpeg');
         });
 
         function showOcr(message, error = false) {
@@ -330,51 +378,38 @@
             const notes = $('notes').value.trim();
             const quantity = Number($('quantity').value);
             const subject = $('subject').value;
-            const formats = [...document.querySelectorAll('#formatList input:checked')].map(i => i.value);
 
-            if (!apiKey) { return showError('Please paste your Gemini API key in the yellow box above (follow the 3 steps).'); }
-            if (!notes) { return showError('Please paste chapter notes or upload a textbook photo.'); }
-            if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50) { return showError('Choose between 1 and 50 questions.'); }
-            if (!formats.length) { return showError('Please select at least one question format.'); }
+            if (!apiKey) { return showError('Please paste your Gemini API key in the yellow box above.'); }
+            if (!notes) { return showError('Please paste chapter notes or upload & crop textbook photos.'); }
+            if (!Number.isInteger(quantity) || quantity < 1 || quantity > 20) { return showError('Choose between 1 and 20 questions for the quiz.'); }
 
             setLoading(true);
             $('statusBox').classList.add('hidden');
             $('questionOutput').innerHTML = '';
             $('answerOutput').classList.add('hidden');
-            $('answerToggle').disabled = true;
             $('printBtn').disabled = true;
-            answerKeyVisible = false;
-            $('answerToggle').textContent = 'Show Answer Key';
+            userAnswers = {};
 
             const prompt = `
-You are an expert school board teacher and exam setter.
-Create exactly ${quantity} original practice questions.
+You are an expert school board teacher and quiz master.
+Create exactly ${quantity} Multiple Choice Questions (MCQs) based ONLY on the supplied study notes.
 SUBJECT: ${subject}
-REQUESTED FORMATS: ${formats.join(', ')}
 
 INSTRUCTIONS:
-1. Use ONLY the supplied study notes as the factual source.
-2. Match school board examination style.
-3. Avoid duplicate questions.
-4. MCQs must have four options labelled A-D.
-5. True/False questions must have clear statements.
-6. Fill in the Blanks must contain ______.
-7. Match the Following must include a pairs array: "pairs": [{"left":"Item A","right":"Match A"}].
-8. 2-Mark, 3-Mark and 4-Mark questions must match board exam depth.
-9. Include accurate answers and brief explanations.
+1. Provide four options labelled A-D for each question.
+2. Specify the exact correct answer (must match one of the options).
+3. Include a short subtopic name (e.g., Algebra, Light, Grammar).
+4. Include a brief explanation for the correct answer.
 
 Return ONLY valid JSON in this exact structure:
 {
-  "title": "${subject} Practice Question Set",
+  "title": "${subject} Interactive Quiz",
   "questions": [
     {
-      "number": 1,
-      "type": "MCQs",
-      "marks": 1,
-      "question": "Question text",
+      "question": "Question text here?",
       "options": ["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4"],
-      "pairs": [],
-      "answer": "Correct answer",
+      "correctAnswer": "A. Option 1",
+      "subtopic": "Main Subtopic",
       "explanation": "Brief explanation"
     }
   ]
@@ -391,16 +426,12 @@ ${notes.slice(0, 30000)}
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.45, responseMimeType: 'application/json' }
+                        generationConfig: { temperature: 0.4, responseMimeType: 'application/json' }
                     })
                 });
                 const payload = await response.json().catch(() => ({}));
                 if (!response.ok) {
-                    const msg = payload?.error?.message || `API request failed (${response.status}).`;
-                    if (response.status === 400 || response.status === 401 || response.status === 403) {
-                        throw new Error('Invalid API key. Please check your Gemini API key and try again. (' + msg + ')');
-                    }
-                    throw new Error(msg);
+                    throw new Error(payload?.error?.message || `API request failed (${response.status}).`);
                 }
 
                 const raw = payload?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\n');
@@ -408,13 +439,13 @@ ${notes.slice(0, 30000)}
 
                 const parsed = parseModelJson(raw);
                 if (!Array.isArray(parsed.questions) || !parsed.questions.length) {
-                    throw new Error('No valid questions were returned.');
+                    throw new Error('No valid quiz questions were returned.');
                 }
 
                 generatedQuestions = parsed.questions.slice(0, quantity);
-                renderResults(parsed.title || `${subject} Practice Set`, subject);
+                renderInteractiveQuiz(parsed.title || `${subject} Quiz`, subject);
             } catch (error) {
-                showError(error.message || 'Something went wrong while generating questions.');
+                showError(error.message || 'Something went wrong while generating quiz.');
             } finally {
                 setLoading(false);
             }
@@ -430,59 +461,142 @@ ${notes.slice(0, 30000)}
                 if (start >= 0 && end > start) {
                     return JSON.parse(cleaned.slice(start, end + 1));
                 }
-                throw new Error('Could not read the AI response. Please try again.');
+                throw new Error('Could not read the AI response.');
             }
         }
 
-        function renderResults(title, subject) {
+        function renderInteractiveQuiz(title, subject) {
             $('statusBox').classList.add('hidden');
             $('resultsTitle').textContent = title;
-            $('resultsMeta').textContent = `${subject} · ${generatedQuestions.length} questions · Generated just now`;
+            $('resultsMeta').textContent = `${subject} · ${generatedQuestions.length} questions · Play & Test below`;
 
-            $('questionOutput').innerHTML = generatedQuestions.map((q, index) => {
-                const options = Array.isArray(q.options) && q.options.length
-                    ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
-                        ${q.options.map(opt => `<div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 px-3 py-2 text-sm">${escapeHtml(opt)}</div>`).join('')}
-                       </div>`
-                    : '';
+            let html = '';
+            generatedQuestions.forEach((q, index) => {
+                let optionsHTML = '';
+                q.options.forEach((opt) => {
+                    optionsHTML += `
+                        <button onclick="selectOption(${index}, '${escapeAttr(opt)}', this)" 
+                            class="option-btn-${index} w-full text-left p-3 my-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 hover:bg-indigo-50 dark:hover:bg-slate-800 transition text-sm font-medium">
+                            ${escapeHtml(opt)}
+                        </button>
+                    `;
+                });
 
-                const pairs = Array.isArray(q.pairs) && q.pairs.length
-                    ? `<div class="grid grid-cols-2 gap-3 mt-3 text-sm">
-                        <div class="space-y-1">${q.pairs.map(p => `<div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-2">${escapeHtml(p.left)}</div>`).join('')}</div>
-                        <div class="space-y-1">${q.pairs.map(p => `<div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-2">${escapeHtml(p.right)}</div>`).join('')}</div>
-                       </div>`
-                    : '';
-
-                return `
-                    <article class="question-card rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5">
+                html += `
+                    <article class="question-card rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 bg-white dark:bg-slate-900 shadow-sm">
                         <div class="flex items-center justify-between gap-3 mb-2">
-                            <span class="text-xs font-bold text-indigo-600">QUESTION ${index + 1}</span>
-                            <span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1">${escapeHtml(q.type || 'Question')} · ${Number(q.marks) || 1} mark(s)</span>
+                            <span class="text-xs font-bold px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600">${escapeHtml(q.subtopic || 'General')}</span>
+                            <span class="text-xs font-semibold text-slate-400">QUESTION ${index + 1}</span>
                         </div>
-                        <p class="font-semibold text-sm sm:text-base leading-relaxed">${escapeHtml(q.question || 'Question text unavailable.')}</p>
-                        ${options}
-                        ${pairs}
+                        <p class="font-semibold text-sm sm:text-base leading-relaxed mb-3">${escapeHtml(q.question)}</p>
+                        <div class="options-group space-y-1">${optionsHTML}</div>
                     </article>
                 `;
-            }).join('');
+            });
 
-            $('answerList').innerHTML = generatedQuestions.map((q, index) => `
-                <div class="rounded-xl bg-emerald-50 dark:bg-emerald-950/25 border border-emerald-100 dark:border-emerald-900 p-4">
-                    <div class="text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-1">QUESTION ${index + 1}</div>
-                    <p class="text-sm font-semibold">${escapeHtml(q.answer || 'Answer not provided.')}</p>
-                    ${q.explanation ? `<p class="text-xs text-slate-600 dark:text-slate-400 mt-1">${escapeHtml(q.explanation)}</p>` : ''}
-                </div>
-            `).join('');
+            html += `
+                <button id="submitQuizBtn" onclick="evaluateQuiz()" class="mt-6 w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-xl transition text-base">
+                    🎯 Submit Quiz & See Analysis
+                </button>
+            `;
 
-            $('answerToggle').disabled = false;
+            $('questionOutput').innerHTML = html;
             $('printBtn').disabled = false;
         }
 
-        $('answerToggle').addEventListener('click', () => {
-            answerKeyVisible = !answerKeyVisible;
-            $('answerOutput').classList.toggle('hidden', !answerKeyVisible);
-            $('answerToggle').textContent = answerKeyVisible ? 'Hide Answer Key' : 'Show Answer Key';
-        });
+        window.selectOption = function(qIndex, selectedText, btnElement) {
+            userAnswers[qIndex] = selectedText;
+            
+            const allBtns = document.querySelectorAll(`.option-btn-${qIndex}`);
+            allBtns.forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600', 'dark:bg-indigo-600');
+                b.classList.add('bg-slate-50', 'dark:bg-slate-950');
+            });
+
+            btnElement.classList.remove('bg-slate-50', 'dark:bg-slate-950');
+            btnElement.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+        };
+
+        window.evaluateQuiz = function() {
+            let score = 0;
+            let topicStats = {};
+
+            generatedQuestions.forEach((q, index) => {
+                const userAns = userAnswers[index];
+                const isCorrect = (userAns && userAns.trim() === q.correctAnswer.trim());
+                const topic = q.subtopic || 'General';
+
+                if (!topicStats[topic]) {
+                    topicStats[topic] = { total: 0, correct: 0 };
+                }
+                topicStats[topic].total++;
+                if (isCorrect) topicStats[topic].correct++;
+
+                const allBtns = document.querySelectorAll(`.option-btn-${index}`);
+                allBtns.forEach(btn => {
+                    btn.disabled = true;
+                    const btnText = btn.textContent.trim();
+                    if (btnText === q.correctAnswer.trim()) {
+                        btn.classList.remove('bg-indigo-600', 'bg-slate-50');
+                        btn.classList.add('bg-emerald-600', 'text-white', 'border-emerald-600');
+                    } else if (userAns && btnText === userAns.trim() && !isCorrect) {
+                        btn.classList.remove('bg-indigo-600', 'bg-slate-50');
+                        btn.classList.add('bg-rose-600', 'text-white', 'border-rose-600');
+                    }
+                });
+
+                if (isCorrect) score++;
+            });
+
+            const submitBtn = $('submitQuizBtn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = `Quiz Completed! Score: ${score} / ${generatedQuestions.length}`;
+                submitBtn.className = 'mt-6 w-full py-4 bg-slate-800 text-white font-bold rounded-2xl shadow-md cursor-not-allowed';
+            }
+
+            let strengths = [];
+            let weaknesses = [];
+
+            for (const [topic, data] of Object.entries(topicStats)) {
+                const accuracy = (data.correct / data.total) * 100;
+                if (accuracy >= 60) {
+                    strengths.push(`${topic} (${data.correct}/${data.total})`);
+                } else {
+                    weaknesses.push(`${topic} (${data.correct}/${data.total})`);
+                }
+            }
+
+            const analysisHTML = `
+                <div class="p-6 mb-6 rounded-3xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl">
+                    <h3 class="text-2xl font-black mb-1">🎉 Quiz Analysis Result</h3>
+                    <p class="text-indigo-100 text-sm mb-4">Your Final Score: <span class="text-2xl font-extrabold text-white">${score} / ${generatedQuestions.length}</span></p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div class="bg-white/10 p-4 rounded-2xl backdrop-blur-sm">
+                            <h4 class="font-bold text-emerald-300 mb-1">💪 Strengths:</h4>
+                            <p class="text-indigo-50">${strengths.length > 0 ? strengths.join(', ') : 'Keep practicing!'}</p>
+                        </div>
+                        <div class="bg-white/10 p-4 rounded-2xl backdrop-blur-sm">
+                            <h4 class="font-bold text-rose-300 mb-1">🎯 Weaknesses:</h4>
+                            <p class="text-indigo-50">${weaknesses.length > 0 ? weaknesses.join(', ') : 'No weak topics found.'}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('questionOutput').insertAdjacentHTML('afterbegin', analysisHTML);
+
+            $('answerList').innerHTML = generatedQuestions.map((q, index) => `
+                <div class="rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4">
+                    <div class="text-xs font-bold text-indigo-600 mb-1">QUESTION ${index + 1} EXPLANATION</div>
+                    <p class="text-sm font-semibold mb-1">Correct Answer: ${escapeHtml(q.correctAnswer)}</p>
+                    <p class="text-xs text-slate-600 dark:text-slate-400">${escapeHtml(q.explanation || 'No explanation provided.')}</p>
+                </div>
+            `).join('');
+            $('answerOutput').classList.remove('hidden');
+
+            window.scrollTo({ top: $('resultsPanel').offsetTop - 20, behavior: 'smooth' });
+        };
 
         $('printBtn').addEventListener('click', () => window.print());
 
@@ -490,14 +604,14 @@ ${notes.slice(0, 30000)}
             $('statusBox').classList.remove('hidden');
             $('statusBox').innerHTML = `
                 <div class="text-3xl mb-3">⚠️</div>
-                <h3 class="font-bold text-red-600">Unable to Generate Questions</h3>
+                <h3 class="font-bold text-red-600">Unable to Generate Quiz</h3>
                 <p class="text-sm text-slate-600 dark:text-slate-400 mt-2">${escapeHtml(message)}</p>
             `;
         }
 
         function setLoading(loading) {
             $('generateBtn').disabled = loading;
-            $('generateBtn').textContent = loading ? 'Generating Questions...' : '✨ Generate Questions';
+            $('generateBtn').textContent = loading ? 'Generating Quiz Game...' : '✨ Generate Quiz Game';
         }
 
         function escapeHtml(value) {
@@ -505,6 +619,62 @@ ${notes.slice(0, 30000)}
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             }[c]));
         }
+
+        function escapeAttr(value) {
+            return String(value ?? '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+    </script>
+
+    <!-- FIREBASE AUTHENTICATION -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+  apiKey: "AIzaSyDKOO6g6kJ37BVEPRn-lvAYoL5YFMZUWf0",
+  authDomain: "examcraft-ai-dd4fb.firebaseapp.com",
+  projectId: "examcraft-ai-dd4fb",
+  storageBucket: "examcraft-ai-dd4fb.firebasestorage.app",
+  messagingSenderId: "487646544972",
+  appId: "1:487646544972:web:17dfbb99bda496bf7aa0e9",
+  measurementId: "G-S9Z1S4TSJ8"
+};
+
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        const loginScreen = document.getElementById('loginScreen');
+        const loginBtn = document.getElementById('googleLoginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userNameDisplay = document.getElementById('userNameDisplay');
+        const authError = document.getElementById('authError');
+
+        loginBtn.addEventListener('click', () => {
+            authError.classList.add('hidden');
+            signInWithPopup(auth, provider).catch((error) => {
+                authError.textContent = "Login Error: " + error.message;
+                authError.classList.remove('hidden');
+            });
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth);
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loginScreen.style.display = 'none';
+                logoutBtn.classList.remove('hidden');
+                userNameDisplay.textContent = `Hi, ${user.displayName ? user.displayName.split(' ')[0] : 'Student'}`;
+                userNameDisplay.classList.remove('hidden');
+            } else {
+                loginScreen.style.display = 'flex';
+                logoutBtn.classList.add('hidden');
+                userNameDisplay.classList.add('hidden');
+            }
+        });
     </script>
 </body>
-</html>v
+</html>

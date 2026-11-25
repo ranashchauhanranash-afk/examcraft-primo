@@ -186,7 +186,6 @@
                     <div class="text-3xl mb-1">📸</div>
                     <span class="font-semibold text-sm"> Choose Multiple Textbook Images </span>
                     <span class="text-xs text-slate-500 mt-1"> Select multiple photos to crop & scan </span>
-                    <!-- MULTIPLE attribute added here -->
                     <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" multiple class="hidden" />
                 </label>
                 <div id="ocrStatus" class="hidden mt-3 rounded-xl p-3 text-xs"></div>
@@ -251,7 +250,7 @@
 
     <!-- QUIZ & CROPPER SCRIPT -->
     <script>
-        const API_MODEL = 'gemini-1.5-flash';
+        const API_MODEL = 'gemini-2.5-flash';
         const $ = id => document.getElementById(id);
         let generatedQuestions = [];
         let userAnswers = {};
@@ -358,7 +357,6 @@
                     showOcr('OCR scan failed.', true);
                 }
                 
-                // Process next image in queue if multiple were selected
                 if (imageQueue.length > 0) {
                     setTimeout(processNextImageInQueue, 500);
                 }
@@ -420,8 +418,10 @@ ${notes.slice(0, 30000)}
 `;
 
             try {
-                const targetUrl = `https://generativelanguage.googleapis.com/v1beta/${API_MODEL}:generateContent?key=${savedKey}`;
-const endpoint = `https://api.corsproxy.io/raw?url=` + encodeURIComponent(targetUrl);
+                // CORS Proxy implementation to completely bypass "Failed to fetch" errors
+                const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=${apiKey}`;
+                const endpoint = `https://corsproxy.io/?` + encodeURIComponent(targetUrl);
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -435,7 +435,7 @@ const endpoint = `https://api.corsproxy.io/raw?url=` + encodeURIComponent(target
                     throw new Error(payload?.error?.message || `API request failed (${response.status}).`);
                 }
 
-                const raw = payload?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\n');
+                const raw = payload?.contents?.[0]?.parts?.[0]?.text || payload?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\n');
                 if (!raw) throw new Error('Gemini returned an empty response.');
 
                 const parsed = parseModelJson(raw);
@@ -632,15 +632,13 @@ const endpoint = `https://api.corsproxy.io/raw?url=` + encodeURIComponent(target
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
-  apiKey: "AIzaSyDKOO6g6kJ37BVEPRn-lvAYoL5YFMZUWf0",
-  authDomain: "examcraft-ai-dd4fb.firebaseapp.com",
-  projectId: "examcraft-ai-dd4fb",
-  storageBucket: "examcraft-ai-dd4fb.firebasestorage.app",
-  messagingSenderId: "487646544972",
-  appId: "1:487646544972:web:17dfbb99bda496bf7aa0e9",
-  measurementId: "G-S9Z1S4TSJ8"
-};
-
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
